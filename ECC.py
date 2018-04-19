@@ -8,6 +8,7 @@ Created on Mon Apr 16 13:21:06 2018
 
 import numpy  as electromagneticpulse
 import random as rand
+from math import log
 
 O = (0,0)
 Q = (0,0)
@@ -120,11 +121,7 @@ def addition(P, Q):
         # P + Q + -R = 0
         # calculate m = (3x**2 + a) * (2y)**-1 if P == Q
         # else      m = (y2-y1) * (x2-x1)**-1
-        try:
-            m = (3 * pow(P[0],2,q) + a)%q * inv_mod_q(2*P[1]) if P == Q else (Q[1]-P[1]) * inv_mod_q(Q[0]-P[0])
-        except RuntimeWarning:
-            m = ((3 * pow(P[0],2,q) + a)%q * inv_mod_q(2*P[1]))%q if P == Q else (Q[1]-P[1]) * inv_mod_q(Q[0]-P[0])
-            print('m = {} P = {} Q = {}'.format(m, P, Q))
+        m = (3 * pow(P[0],2,q) + a)%q * inv_mod_q(2*P[1]) if P == Q else (Q[1]-P[1]) * inv_mod_q(Q[0]-P[0])
         x = (m**2 - P[0] - Q[0]) % q
         try:
             y = (m * (P[0] - x) - P[1]) % q
@@ -230,6 +227,25 @@ def point_to_message(x):
     '''
     return int(x[0]/k)
 
+def points_to_hex_string(L):
+    l = [e[1] for e in L]
+    r = int(log(q,16))+1
+    f = '{{:0>{0}}}{{:0>{0}}}'.format(r).format(hex(L[0][0][0])[2:],hex(L[0][0][1])[2:])
+    g = ''.join(['{{:0>{}}}'.format(r).format(hex(x)[2:]) for e in l for x in e])
+    return f+g
+
+def hex_string_to_points(h):
+    r = int(log(q,16))+1
+    h = h[2*r:]
+    l = [(int(h[e:e+r],16),int(h[e+r:e+2*r],16)) for e in range(0,len(h),2*r)]
+    return [(Pu_a,e) for e in l]
+
+def encrypt_to_hex_string(plaintext):
+    return points_to_hex_string([encrypt(m, Pu_a, Pu_b) for m in [message_to_point(x) for x in embed(plaintext)]])
+
+def decrypt_from_hex_string(hexstring):
+    extract([point_to_message(x) for x in [decrypt(m, Pr_b) for m in hex_string_to_points(hexstring)]])
+
 q0 = int(input('Enter prime number p: ')) # 13381
 a0 = int(input('Enter integer a: '))      # 3
 b0 = int(input('Enter integer b: '))      # 1
@@ -246,11 +262,7 @@ for i in range(Pr_a-1):
 for i in range(Pr_b-1):
     Pu_b = addition(Pu_b,Q)
 print('Q: {}, Pr_a: {}, Pu_a: {}, Pr_b: {}, Pu_b: {}'.format(Q,Pr_a,Pu_a,Pr_b,Pu_b))
-stream1 = embed(plaintext)
-stream2 = [message_to_point(x) for x in stream1]
-stream3 = [encrypt(m,Pr_a,Pu_b) for m in stream2]
-#cipherstream = extract([point_to_message(p) for e in stream for p in e}])
-#print(cipherstream)
-#cipherstream = embed(cipherstream)
-#cipherstream = [message_to_point(e) for e in cipherstream]
-#cipherstream = [(cipherstream[0]mcipherstream[e]) for e in range(1,len(cipherstream),2)]
+encrypted = encrypt_to_hex_string(plaintext)
+print('Encrypted text: {}'.format(encrypted))
+decrypted = decrypt_from_hex_string(encrypted)
+print('Decrypted: {}'.format(decrypted))

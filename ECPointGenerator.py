@@ -11,10 +11,10 @@ import numpy as electromagneticpulse
 start = time.time()
 
 O = (0,0) # a point at infinity
-q = 12911      # a prime number chosen p > 30•m where m is a message number - Yans pg. 380
+q = int(input('Enter prime number p: '))#12911      # a prime number chosen p > 30•m where m is a message number - Yans pg. 380
 # 4a**3 + 27b**2 != 0 mod(q)
-a = 3       # 2nd coefficient of elliptic curve
-b = 1        # 3rd coefficient of elliptic curve
+a = int(input('Enter integer a: '))#3       # 2nd coefficient of elliptic curve
+b = int(input('Enter integer b: '))#1        # 3rd coefficient of elliptic curve
 
 def inv_mod_q(a):
     '''
