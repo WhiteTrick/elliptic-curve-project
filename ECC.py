@@ -10,12 +10,13 @@ import numpy  as electromagneticpulse
 import random as rand
 from math import log
 
-O = (0,0)
-Q = (0,0)
-q = 0
-a = 0
-b = 0
-k = 50
+O = (0,0)    #the point at infinity
+Q = (0,0)    #point for encryption
+E = []       #points on the elliptic curve over a finite field
+q = 0        #a prime number defining the finite field
+a = 0        #co-efficient in Elliptic Curve E
+b = 0        #co-efficient in Elliptic Curve E
+k = 50       #used to decrease chances that a message cannot be embedded in E
 
 def load_elliptic_curve(q0,a0,b0):
     '''
@@ -37,9 +38,9 @@ def load_elliptic_curve(q0,a0,b0):
     f = './Curves/ECPoints_{}_{}_{}.csv'.format(q,a,b)
     try:
         print('loading {}'.format(f))
-        D = electromagneticpulse.loadtxt(f, dtype='int64', delimiter=',')
-        D = list(map(lambda x:(x[0].item(),x[1].item()),D))
-        return D
+        E = electromagneticpulse.loadtxt(f, dtype='int64', delimiter=',')
+        E = list(map(lambda x:(x[0].item(),x[1].item()),E))
+        return E
     except IOError:
         print('{} could not be found, creating file'.format(f))
         return create_elliptic_curve(q, a, b)
@@ -59,17 +60,17 @@ def create_elliptic_curve(q0,a0,b0):
     q = q0
     a = a0
     b = b0
-    D =  list(filter(lambda x:x[1]>=0,map(lambda x:(x,modularSquareRoot(pow(x,3,q)+a*x+b)),range(q))))
-    D += list(filter(lambda x:x[1]>=0,map(lambda x:(x[0],q-x[1]),filter(lambda x:x[1] > 0,D))))
+    E =  list(filter(lambda x:x[1]>=0,map(lambda x:(x,modularSquareRoot(pow(x,3,q)+a*x+b)),range(q))))
+    E += list(filter(lambda x:x[1]>=0,map(lambda x:(x[0],q-x[1]),filter(lambda x:x[1] > 0,E))))
 
     f = './Curves/ECPoints_{}_{}_{}.csv'.format(q,a,b)
 
-    electromagneticpulse.savetxt(f, D, delimiter=',', fmt='%d')
-    return D
+    electromagneticpulse.savetxt(f, E, delimiter=',', fmt='%d')
+    return E
 
-def select_Q(Q0):
+def select_Q(i):
     global Q
-    Q = Q0
+    Q = E[i]
 
 def inv_mod_q(a):
     '''
@@ -159,10 +160,8 @@ def encrypt(x, Pu_a, Pu_b):
     Pr_a -- your private key to encrypt with
     Pu_b -- their public key
     '''
-#    t = Q
     β = Pu_b
     for i in range(Pr_a-1):
-#        t = addition(t,Q)
         β = addition(β,Pu_b)
     β = addition(x,β)
     return (Pu_a,β)
@@ -228,33 +227,65 @@ def point_to_message(x):
     return int(x[0]/k)
 
 def points_to_hex_string(L):
-    l = [e[1] for e in L]
-    r = int(log(q,16))+1
+    '''
+    converts a list of points in the form
+    [((a_0,b_0)(c_0,d_0)),((a_0,b_0),(c_1,d_1)),...,((a_0,b_0),(c_n,d_n))]
+    into a string of hexadecimal values
+    
+    Keyword arguments:
+    L -- the list of points to be converted
+    '''
+    l = [e[1] for e in L] # (a_0,b_0) from L
+    r = int(log(q,16))+1  # calculate length of Hexadecimal value
+    #convert (a_0,b_0) to a hex string in the form <hex(a_0)><hex(b_0)>
     f = '{{:0>{0}}}{{:0>{0}}}'.format(r).format(hex(L[0][0][0])[2:],hex(L[0][0][1])[2:])
+    #convert elements in l to a concatenated hex string
     g = ''.join(['{{:0>{}}}'.format(r).format(hex(x)[2:]) for e in l for x in e])
     return f+g
 
 def hex_string_to_points(h):
+    '''
+    converts a string of hexadecimal values in the form
+    <hex(a_0)><hex(b_0)><hex(c_0)><hex(d_0)><hex(c_1)><hex(d_1)>...<hex(c_n)><hex(d_n)>
+    into a list of points in the form
+    [((a_0,b_0)(c_0,d_0)),((a_0,b_0),(c_1,d_1)),...,((a_0,b_0),(c_n,d_n))]
+    
+    Keyword arguments:
+    h -- the hex string to be converted
+    '''
     r = int(log(q,16))+1
     h = h[2*r:]
     l = [(int(h[e:e+r],16),int(h[e+r:e+2*r],16)) for e in range(0,len(h),2*r)]
     return [(Pu_a,e) for e in l]
 
 def encrypt_to_hex_string(plaintext):
+    '''
+    encrypts the plaintext using Elliptic Curve Cryptography
+    
+    Keyword arguments:
+    plaintext -- the plaintext to be encrypted
+    '''
     return points_to_hex_string([encrypt(m, Pu_a, Pu_b) for m in [message_to_point(x) for x in embed(plaintext)]])
 
 def decrypt_from_hex_string(hexstring):
+    '''
+    decrypts the encrypted message using Elliptic Curve Cryptography
+    
+    Keyword arguments:
+    hexstring -- the encrypted message to be decrypted
+    '''
     extract([point_to_message(x) for x in [decrypt(m, Pr_b) for m in hex_string_to_points(hexstring)]])
 
 q0 = int(input('Enter prime number p: ')) # 13381
 a0 = int(input('Enter integer a: '))      # 3
 b0 = int(input('Enter integer b: '))      # 1
-D = load_elliptic_curve(q0,a0,b0)
+E = load_elliptic_curve(q0,a0,b0)
 plaintext = str(input('Enter plaintext: ')) # Hello World!
 # generate private and public keys
-Pr_a = rand.randint(1,len(D))
-Pr_b = rand.randint(1,len(D))
-Q = D[rand.randint(1,len(D))]
+Pr_a = rand.randint(1,len(E))
+Pr_b = rand.randint(1,len(E))
+    # select point Q
+Q = select_Q(rand.randint(1,len(E)))
 Pu_a = Q
 Pu_b = Q
 for i in range(Pr_a-1):
@@ -262,7 +293,9 @@ for i in range(Pr_a-1):
 for i in range(Pr_b-1):
     Pu_b = addition(Pu_b,Q)
 print('Q: {}, Pr_a: {}, Pu_a: {}, Pr_b: {}, Pu_b: {}'.format(Q,Pr_a,Pu_a,Pr_b,Pu_b))
+#encrypt plaintext
 encrypted = encrypt_to_hex_string(plaintext)
 print('Encrypted text: {}'.format(encrypted))
+#decrypt plaintext
 decrypted = decrypt_from_hex_string(encrypted)
 print('Decrypted: {}'.format(decrypted))
